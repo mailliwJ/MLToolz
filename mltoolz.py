@@ -8,6 +8,9 @@ import seaborn as sns
 
 from scipy.stats import pearsonr, chi2_contingency
 from sklearn.feature_selection import mutual_info_classif
+from sklearn.model_selection import cross_validate
+from sklearn.metrics import classification_report, ConfusionMatrixDisplay, get_scorer                           
+from sklearn.base import is_classifier, is_regressor
 
 # ----------------------------------------------------------------------------------------------------------------
 
@@ -291,4 +294,119 @@ def select_cat_features(data, target_col, target_type='cat', cat_threshold=10, m
     # Return the list of selected categorical features
     return features_cat
 
-# ----------------------------------------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------------------------------------------------------------
+
+def cv_evaluate(model, X, y, scoring=None, cv=5, return_train_score=False, print_scores=False):
+    """
+    Cross-validate a model with custom scoring metrics and cross-validation strategy.
+    
+    Parameters:
+    - model: The machine learning model to evaluate.
+    - X: Features dataset.
+    - y: Target variable.
+    - scoring: List of scoring metrics to use. Must contain at least one metric.
+    - cv: Cross-validation strategy or number of folds. Default is 5.
+    - return_train_score: Whether to return training scores. Default is False.
+    - print_scores: If True, print mean scores after cross-validation. Default is False.
+    
+    Returns:
+    - results_dict: Dictionary of mean test scores (and train scores if `return_train_score=True`).
+    """
+    # Error check for scoring parameter
+    if scoring is None or not isinstance(scoring, list) or len(scoring) == 0:
+        raise ValueError("The 'scoring' parameter must be a non-empty list with at least one valid metric.")
+
+    # Run cross-validation
+    results = cross_validate(model, X, y, cv=cv, scoring=scoring, return_train_score=return_train_score)
+
+    # Calculate mean test scores for each metric
+    results_dict = {f'test_{metric}': np.mean(results[f'test_{metric}']) for metric in scoring}
+    
+    # Optionally include train scores
+    if return_train_score:
+        train_scores = {f'train_{metric}': np.mean(results[f'train_{metric}']) for metric in scoring}
+        results_dict.update(train_scores)
+    
+    # Print scores if requested
+    if print_scores:
+        print(f'Mean Cross Validation Scores for {model.__class__.__name__}:\n{"-"*30}')
+        for metric, score in results_dict.items():
+            print(f'{metric.capitalize()}: {score:.5f}')
+    
+    return results_dict
+
+# -----------------------------------------------------------------------------------------------------------------------------------
+
+def fit_test_evaluate(model, X_train, y_train, X_test, y_test, metrics=None, print_report=True, return_scores=False):
+    """
+    Fit a model, evaluate it on the test set with custom metrics, and print/display results.
+
+    Parameters:
+    - model: The machine learning model to evaluate.
+    - X_train: Training feature set.
+    - y_train: Training labels.
+    - X_test: Test feature set.
+    - y_test: Test labels.
+    - metrics: List of metric names to evaluate. Defaults to common classification/regression metrics.
+    - print_report: Whether to print results (scores, classification report, confusion matrix/residual plot). Default is True.
+    - return_scores: If True, return a dictionary of computed scores. Default is False.
+
+    Returns:
+    - scores_dict (optional): Dictionary of computed scores if return_scores=True.
+    """
+    # Determine model type and default metrics
+    if is_classifier(model):
+        model_type = 'classification'
+        if metrics is None:
+            metrics = ['accuracy', 'f1', 'roc_auc']
+    elif is_regressor(model):
+        model_type = 'regression'
+        if metrics is None:
+            metrics = ['r2', 'neg_mean_squared_error', 'neg_mean_absolute_error']
+    else:
+        raise ValueError("The model must be either a classifier or a regressor.")
+    
+    # Fit the model and make predictions
+    model.fit(X_train, y_train)
+    y_preds = model.predict(X_test)
+
+    # Calculate requested metrics
+    scores_dict = {}
+    for metric in metrics:
+        if metric in ['accuracy', 'f1', 'roc_auc', 'r2', 'neg_mean_squared_error', 'neg_mean_absolute_error']:
+            scorer = get_scorer(metric)
+            score = scorer._score_func(y_test, y_preds)
+            # Flip sign for negative metrics (like neg_mean_squared_error)
+            scores_dict[metric] = -score if 'neg_' in metric else score
+
+    # Print scores if requested
+    if print_report:
+        print(f'Test Scores ({model_type.capitalize()}):\n{"-"*30}')
+        for metric, score in scores_dict.items():
+            print(f'{metric.capitalize().replace("_", " ")}: {score:.5f}')
+        
+        if model_type == 'classification':
+            # Classification-specific reporting
+            print(f'\nClassification Report:\n{"-"*22}')
+            print(classification_report(y_test, y_preds))
+            
+            print(f'\nConfusion Matrix:\n{"-"*17}')
+            ConfusionMatrixDisplay.from_predictions(y_test, y_preds)
+            plt.show()
+        
+        elif model_type == 'regression':
+            # Regression-specific visualization
+            print(f'\nResidual Plot:\n{"-"*17}')
+            residuals = y_test - y_preds
+            plt.scatter(y_preds, residuals)
+            plt.axhline(y=0, color='r', linestyle='--')
+            plt.xlabel('Predicted values')
+            plt.ylabel('Residuals')
+            plt.title('Residual Plot')
+            plt.show()
+
+    # Return scores if requested
+    if return_scores:
+        return scores_dict
+
+# -----------------------------------------------------------------------------------------------------------------------------------
