@@ -332,6 +332,7 @@ def cv_evaluate(model, X, y, scoring=None, cv=5, return_train_score=False, print
         print(f'Mean Cross Validation Scores for {model.__class__.__name__}:\n{"-"*30}')
         for metric, score in results_dict.items():
             print(f'{metric.capitalize()}: {score:.5f}')
+            print()
     
     return results_dict
 
