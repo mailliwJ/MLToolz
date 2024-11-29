@@ -332,7 +332,7 @@ def cv_evaluate(model, X, y, scoring=None, cv=5, return_train_score=False, print
         print(f'Mean Cross Validation Scores for {model.__class__.__name__}:\n{"-"*30}')
         for metric, score in results_dict.items():
             print(f'{metric.capitalize()}: {score:.5f}')
-            print()
+        print()
     
     return results_dict
 
@@ -374,7 +374,7 @@ def fit_test_evaluate(model, X_train, y_train, X_test, y_test, metrics=None, pri
     # Calculate requested metrics
     scores_dict = {}
     for metric in metrics:
-        if metric in ['accuracy', 'f1', 'roc_auc', 'r2', 'neg_mean_squared_error', 'neg_mean_absolute_error']:
+        if metric in ['accuracy', 'f1', 'roc_auc', 'r2', 'neg_mean_squared_error', 'neg_mean_absolute_error', 'neg_root_mean_squared_error', 'neg_mean_absolute_percentage_error']:
             scorer = get_scorer(metric)
             score = scorer._score_func(y_test, y_preds)
             # Flip sign for negative metrics (like neg_mean_squared_error)
