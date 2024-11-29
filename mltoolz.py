@@ -378,7 +378,7 @@ def fit_test_evaluate(model, X_train, y_train, X_test, y_test, metrics=None, pri
             scorer = get_scorer(metric)
             score = scorer._score_func(y_test, y_preds)
             # Flip sign for negative metrics (like neg_mean_squared_error)
-            scores_dict[metric] = -score if 'neg_' in metric else score
+            scores_dict[metric] = abs(score) if 'neg_' in metric else score
 
     # Print scores if requested
     if print_report:
